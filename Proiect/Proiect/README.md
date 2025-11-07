@@ -244,4 +244,4 @@ OrderRevalidated → (continuă flux normal)
    19. OrderModificationRequested
    20. OrderModified
 
-🔵 PRIORITATE SCĂZUTĂ (⭐) - Implementare în Sprint 3:
+
