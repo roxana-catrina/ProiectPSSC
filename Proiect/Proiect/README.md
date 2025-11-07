@@ -244,4 +244,501 @@ OrderRevalidated → (continuă flux normal)
    19. OrderModificationRequested
    20. OrderModified
 
+═══════════════════════════════════════════════════════════════════════════════
+🎯 BOUNDED CONTEXTS - ORGANIZARE DDD
+═══════════════════════════════════════════════════════════════════════════════
 
+Sistemul este structurat în 6 BOUNDED CONTEXTS bazate pe Domain-Driven Design,
+fiecare având responsabilități clare și autonomie în gestionarea evenimentelor.
+
+═══════════════════════════════════════════════════════════════════════════════
+📦 BOUNDED CONTEXT 1: ORDER MANAGEMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESPONSABILITĂȚI:
+   - Gestionează ciclul de viață complet al comenzilor
+   - Validează și procesează comenzile noi
+   - Coordonează modificările și anulările
+   - Menține starea și istoricul comenzilor
+   - Orchestrează workflow-ul comenzii între contexte
+
+📋 EVENIMENTE PROPRII (7 evenimente):
+   1. OrderPlaced ⭐⭐⭐
+      → Comandă nouă plasată de client
+      → Declanșează: OrderValidated
+      
+   2. OrderValidated ⭐⭐⭐
+      → Comanda a fost validată cu succes
+      → Declanșează: StockReserved (INVENTORY context)
+      
+   3. OrderRejected ⭐⭐
+      → Comanda a fost respinsă din cauza validării
+      → Declanșează: CustomerNotified
+      
+   4. OrderConfirmed ⭐⭐⭐
+      → Comanda confirmată pentru procesare
+      → Declanșează: PaymentCompleted (PAYMENT context)
+      
+   5. OrderCancellationRequested ⭐⭐
+      → Solicitare de anulare primită
+      → Declanșează: OrderCancelled
+      
+   6. OrderCancelled ⭐⭐⭐
+      → Comanda a fost anulată
+      → Declanșează: StockReleased, RefundInitiated
+      
+   7. OrderModificationRequested ⭐⭐
+      → Solicitare de modificare primită
+      → Declanșează: OrderModified
+      
+   8. OrderModified ⭐⭐
+      → Comanda a fost modificată
+      → Declanșează: StockReserved (re-validare), PaymentCompleted (ajustare)
+
+🔗 COMENZI PRIMITE (Commands):
+   - PlaceOrderCommand (de la Client)
+   - ValidateOrderCommand (intern)
+   - ConfirmOrderCommand (de la Operator)
+   - CancelOrderCommand (de la Client/Operator)
+   - ModifyOrderCommand (de la Client/Operator)
+
+📤 EVENIMENTE PUBLICATE (Domain Events):
+   - OrderPlaced → către toate contextele (informational)
+   - OrderValidated → către INVENTORY
+   - OrderConfirmed → către PAYMENT
+   - OrderCancelled → către INVENTORY, PAYMENT
+   - OrderModified → către INVENTORY, PAYMENT
+
+📥 EVENIMENTE CONSUMATE (din alte contexte):
+   - StockReserved (din INVENTORY) → pentru confirmare
+   - PaymentCompleted (din PAYMENT) → pentru procesare
+   - OrderShipped (din SHIPPING) → pentru tracking
+   - OrderDelivered (din SHIPPING) → pentru finalizare
+
+🔄 COMUNICARE CU ALTE CONTEXTE:
+   → INVENTORY: Solicită rezervare/eliberare stoc
+   → PAYMENT: Solicită procesare plăți/rambursări
+   → SHIPPING: Trimite comenzi pentru livrare
+   → RETURNS: Primește cereri de returnare
+   → NOTIFICATION: Trimite evenimente pentru notificări
+
+═══════════════════════════════════════════════════════════════════════════════
+💰 BOUNDED CONTEXT 2: PAYMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESPONSABILITĂȚI:
+   - Procesează plățile pentru comenzi
+   - Gestionează tranzacțiile financiare
+   - Execută rambursări pentru anulări/returnări
+   - Integrare cu gateway-uri de plată externe
+   - Menține istoricul tranzacțiilor
+
+📋 EVENIMENTE PROPRII (3 evenimente):
+   5. PaymentCompleted ⭐⭐⭐
+      → Plata procesată cu succes
+      → Declanșează: OrderShipped (SHIPPING context)
+      
+   15. RefundInitiated ⭐⭐
+      → Rambursare inițiată
+      → Declanșează: RefundCompleted
+      
+   16. RefundCompleted ⭐⭐
+      → Rambursare finalizată
+      → Declanșează: CustomerNotified
+
+🔗 COMENZI PRIMITE (Commands):
+   - ProcessPaymentCommand (de la ORDER MANAGEMENT)
+   - InitiateRefundCommand (de la ORDER MANAGEMENT/RETURNS)
+   - VerifyPaymentStatusCommand (intern)
+
+📤 EVENIMENTE PUBLICATE (Domain Events):
+   - PaymentCompleted → către ORDER MANAGEMENT, SHIPPING
+   - RefundCompleted → către ORDER MANAGEMENT, NOTIFICATION
+
+📥 EVENIMENTE CONSUMATE (din alte contexte):
+   - OrderConfirmed (din ORDER MANAGEMENT) → pentru procesare plată
+   - OrderCancelled (din ORDER MANAGEMENT) → pentru rambursare
+   - ReturnAccepted (din RETURNS) → pentru rambursare
+
+🔄 COMUNICARE CU ALTE CONTEXTE:
+   → ORDER MANAGEMENT: Confirmă plăți procesate
+   → SHIPPING: Declanșează livrare după plată
+   → RETURNS: Procesează rambursări pentru returnări
+   → NOTIFICATION: Notifică despre statusul plăților
+
+💳 INTEGRĂRI EXTERNE:
+   - Payment Gateway (Stripe, PayPal, etc.)
+   - Banking APIs
+   - Fraud Detection Services
+
+═══════════════════════════════════════════════════════════════════════════════
+📦 BOUNDED CONTEXT 3: INVENTORY
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESPONSABILITĂȚI:
+   - Gestionează stocul de produse
+   - Rezervă produse pentru comenzi
+   - Eliberează stoc pentru comenzi anulate/livrate
+   - Reintroduce produse returnate în stoc
+   - Monitorizează disponibilitatea produselor
+
+📋 EVENIMENTE PROPRII (2 evenimente):
+   3. StockReserved ⭐⭐⭐
+      → Stoc rezervat pentru comandă
+      → Declanșează: OrderConfirmed (ORDER MANAGEMENT)
+      
+   11. StockReleased ⭐⭐⭐
+      → Stoc eliberat (livrare/anulare/returnare)
+      → Declanșează: StockAvailabilityUpdated (intern)
+
+🔗 COMENZI PRIMITE (Commands):
+   - ReserveStockCommand (de la ORDER MANAGEMENT)
+   - ReleaseStockCommand (de la ORDER MANAGEMENT/SHIPPING/RETURNS)
+   - RestockReturnedItemsCommand (de la RETURNS)
+   - CheckStockAvailabilityCommand (de la ORDER MANAGEMENT)
+
+📤 EVENIMENTE PUBLICATE (Domain Events):
+   - StockReserved → către ORDER MANAGEMENT
+   - StockReleased → către ORDER MANAGEMENT, NOTIFICATION
+   - StockAvailabilityUpdated → către CATALOG (dacă există)
+
+📥 EVENIMENTE CONSUMATE (din alte contexte):
+   - OrderValidated (din ORDER MANAGEMENT) → pentru rezervare
+   - OrderCancelled (din ORDER MANAGEMENT) → pentru eliberare
+   - OrderDelivered (din SHIPPING) → pentru eliberare definitivă
+   - ReturnAccepted (din RETURNS) → pentru reintroducere în stoc
+
+🔄 COMUNICARE CU ALTE CONTEXTE:
+   → ORDER MANAGEMENT: Confirmă rezervări de stoc
+   → SHIPPING: Primește confirmări de livrare
+   → RETURNS: Primește produse returnate
+   → NOTIFICATION: Alertează pentru stoc scăzut
+
+📊 AGREGAT PRINCIPAL:
+   - Product (ProductId, Name, SKU, Quantity, ReservedQuantity)
+   - StockReservation (ReservationId, OrderId, ProductId, Quantity, ExpirationDate)
+
+═══════════════════════════════════════════════════════════════════════════════
+🚚 BOUNDED CONTEXT 4: SHIPPING & DELIVERY
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESPONSABILITĂȚI:
+   - Gestionează procesul de expediere
+   - Coordonează cu serviciile de curierat
+   - Urmărește statusul livrărilor
+   - Confirmă livrările reușite
+   - Gestionează încercările de livrare eșuate
+
+📋 EVENIMENTE PROPRII (2 evenimente):
+   6. OrderShipped ⭐⭐⭐
+      → Comandă expediată către client
+      → Declanșează: OrderDelivered
+      
+   7. OrderDelivered ⭐⭐⭐
+      → Comandă livrată cu succes
+      → Declanșează: StockReleased (INVENTORY)
+
+🔗 COMENZI PRIMITE (Commands):
+   - ShipOrderCommand (de la PAYMENT/ORDER MANAGEMENT)
+   - ConfirmDeliveryCommand (de la Curier)
+   - RescheduleDeliveryCommand (de la Client/Curier)
+   - GenerateShippingLabelCommand (intern)
+
+📤 EVENIMENTE PUBLICATE (Domain Events):
+   - OrderShipped → către ORDER MANAGEMENT, NOTIFICATION
+   - OrderDelivered → către ORDER MANAGEMENT, INVENTORY, NOTIFICATION
+   - DeliveryAttemptFailed → către ORDER MANAGEMENT (dacă există)
+
+📥 EVENIMENTE CONSUMATE (din alte contexte):
+   - PaymentCompleted (din PAYMENT) → pentru expediere
+   - OrderCancelled (din ORDER MANAGEMENT) → pentru oprire expediere
+
+🔄 COMUNICARE CU ALTE CONTEXTE:
+   → ORDER MANAGEMENT: Confirmă expedieri și livrări
+   → INVENTORY: Confirmă livrarea pentru eliberare stoc
+   → PAYMENT: Primește confirmări de plată
+   → NOTIFICATION: Trimite update-uri de tracking
+   → RETURNS: Primește cereri de retur după livrare
+
+🚛 INTEGRĂRI EXTERNE:
+   - Courier APIs (FAN Courier, DHL, etc.)
+   - Address Validation Services
+   - GPS Tracking Systems
+
+📦 AGREGAT PRINCIPAL:
+   - Shipment (ShipmentId, OrderId, AWBNumber, CourierService, Status)
+   - DeliveryTracking (TrackingEvents, Location, EstimatedDelivery)
+
+═══════════════════════════════════════════════════════════════════════════════
+🔄 BOUNDED CONTEXT 5: RETURNS
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESPONSABILITĂȚI:
+   - Procesează cereri de returnare
+   - Aprobă/respinge returnări
+   - Primește și inspectează produse returnate
+   - Declanșează rambursări pentru returnări acceptate
+   - Coordonează cu INVENTORY pentru reintroducere în stoc
+
+📋 EVENIMENTE PROPRII (4 evenimente):
+   9. ReturnRequested ⭐⭐⭐
+      → Cerere de returnare primită
+      → Declanșează: ReturnApproved
+      
+   17. ReturnApproved ⭐⭐
+      → Returnare aprobată
+      → Declanșează: ReturnReceived
+      
+   18. ReturnReceived ⭐⭐
+      → Produse returnate primite în depozit
+      → Declanșează: ReturnAccepted
+      
+   10. ReturnAccepted ⭐⭐⭐
+      → Returnare acceptată după inspecție
+      → Declanșează: StockReleased (INVENTORY), RefundInitiated (PAYMENT)
+
+🔗 COMENZI PRIMITE (Commands):
+   - RequestReturnCommand (de la Client)
+   - ApproveReturnCommand (de la Operator)
+   - ReceiveReturnCommand (de la Warehouse)
+   - InspectReturnCommand (de la Warehouse)
+   - RejectReturnCommand (de la Operator)
+
+📤 EVENIMENTE PUBLICATE (Domain Events):
+   - ReturnRequested → către ORDER MANAGEMENT, NOTIFICATION
+   - ReturnApproved → către NOTIFICATION
+   - ReturnAccepted → către INVENTORY, PAYMENT, NOTIFICATION
+
+📥 EVENIMENTE CONSUMATE (din alte contexte):
+   - OrderDelivered (din SHIPPING) → activează eligibilitatea pentru retur
+   - OrderCancelled (din ORDER MANAGEMENT) → anulează cereri de retur
+
+🔄 COMUNICARE CU ALTE CONTEXTE:
+   → ORDER MANAGEMENT: Raportează returnări procesate
+   → PAYMENT: Solicită rambursări
+   → INVENTORY: Reintroduce produse în stoc
+   → SHIPPING: Coordonează transportul produselor returnate
+   → NOTIFICATION: Notifică clienții despre statusul returului
+
+📋 AGREGAT PRINCIPAL:
+   - Return (ReturnId, OrderId, ReturnedItems, Reason, Status)
+   - ReturnItem (ProductId, Quantity, Condition, InspectionResult)
+
+═══════════════════════════════════════════════════════════════════════════════
+📢 BOUNDED CONTEXT 6: NOTIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESPONSABILITĂȚI:
+   - Trimite notificări către clienți
+   - Gestionează preferințele de notificare
+   - Suportă multiple canale (email, SMS, push)
+   - Menține istoricul notificărilor
+   - Retry logic pentru notificări eșuate
+
+📋 EVENIMENTE PROPRII (1 eveniment):
+   12. CustomerNotified ⭐⭐⭐
+      → Client notificat despre eveniment
+      → End event (nu declanșează alte evenimente)
+
+🔗 COMENZI PRIMITE (Commands):
+   - SendNotificationCommand (de la toate contextele)
+   - UpdateNotificationPreferencesCommand (de la Client)
+   - ResendNotificationCommand (manual)
+
+📤 EVENIMENTE PUBLICATE (Domain Events):
+   - CustomerNotified → către ORDER MANAGEMENT (pentru tracking)
+   - NotificationFailed → către ADMIN (dacă există)
+
+📥 EVENIMENTE CONSUMATE (din TOATE contextele):
+   - OrderPlaced, OrderValidated, OrderRejected
+   - OrderConfirmed, OrderCancelled, OrderModified
+   - PaymentCompleted, RefundCompleted
+   - StockReleased (low stock alerts)
+   - OrderShipped, OrderDelivered
+   - ReturnRequested, ReturnApproved, ReturnAccepted
+
+🔄 COMUNICARE CU ALTE CONTEXTE:
+   → TOATE CONTEXTELE: Primește evenimente pentru notificare
+   → ORDER MANAGEMENT: Confirmă livrarea notificărilor
+
+📧 INTEGRĂRI EXTERNE:
+   - Email Service (SendGrid, AWS SES)
+   - SMS Gateway (Twilio)
+   - Push Notification Services (Firebase)
+
+📨 TIPURI DE NOTIFICĂRI:
+   - Order Confirmation
+   - Payment Confirmation
+   - Shipping Notification
+   - Delivery Confirmation
+   - Cancellation Notice
+   - Refund Confirmation
+   - Return Status Updates
+
+═══════════════════════════════════════════════════════════════════════════════
+🔗 CONTEXT MAP - RELAȚII ÎNTRE BOUNDED CONTEXTS
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        ORDER MANAGEMENT (CORE)                          │
+│                              [Orchestrator]                             │
+└──────────┬────────────┬────────────┬───────────┬────────────┬───────────┘
+           │            │            │           │            │
+           ▼            ▼            ▼           ▼            ▼
+    ┌──────────┐  ┌──────────┐  ┌──────────┐ ┌─────────┐ ┌──────────────┐
+    │ PAYMENT  │  │INVENTORY │  │ SHIPPING │ │ RETURNS │ │ NOTIFICATION │
+    │[Partner] │  │[Partner] │  │[Customer]│ │[Partner]│ │  [Supplier]  │
+    └──────────┘  └──────────┘  └──────────┘ └─────────┘ └──────────────┘
+
+TIPURI DE RELAȚII:
+
+1. ORDER MANAGEMENT ←→ INVENTORY [Partnership]
+   - Bi-directional communication
+   - Shared responsibility pentru stoc
+   - Events: OrderValidated ↔ StockReserved
+
+2. ORDER MANAGEMENT ←→ PAYMENT [Partnership]
+   - Bi-directional communication
+   - Shared responsibility pentru tranzacții
+   - Events: OrderConfirmed ↔ PaymentCompleted
+
+3. ORDER MANAGEMENT → SHIPPING [Customer-Supplier]
+   - ORDER MANAGEMENT = Customer (consumă servicii)
+   - SHIPPING = Supplier (furnizează servicii livrare)
+   - Events: PaymentCompleted → OrderShipped
+
+4. ORDER MANAGEMENT ←→ RETURNS [Partnership]
+   - Bi-directional communication
+   - Shared responsibility pentru returnări
+   - Events: OrderDelivered ↔ ReturnRequested
+
+5. ALL CONTEXTS → NOTIFICATION [Published Language]
+   - Notification = Shared Kernel pentru comunicare
+   - Toate contextele publică evenimente
+   - One-way communication
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 MATRICEA EVENIMENTELOR PE CONTEXTE
+═══════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────┬─────┬─────┬─────┬─────┬─────┬─────┐
+│ EVENT                  │ OM  │ PAY │ INV │ SHP │ RET │ NOT │
+├────────────────────────┼─────┼─────┼─────┼─────┼─────┼─────┤
+│ 1. OrderPlaced         │  P  │     │     │     │     │  C  │
+│ 2. OrderValidated      │  P  │     │  T  │     │     │  C  │
+│ 3. StockReserved       │  C  │     │  P  │     │     │  C  │
+│ 4. OrderConfirmed      │  P  │  T  │     │     │     │  C  │
+│ 5. PaymentCompleted    │  C  │  P  │     │  T  │     │  C  │
+│ 6. OrderShipped        │  C  │     │     │  P  │     │  C  │
+│ 7. OrderDelivered      │  C  │     │  T  │  P  │  T  │  C  │
+│ 8. OrderCancelled      │  P  │  T  │  T  │  T  │     │  C  │
+│ 9. ReturnRequested     │  C  │     │     │     │  P  │  C  │
+│10. ReturnAccepted      │  C  │  T  │  T  │     │  P  │  C  │
+│11. StockReleased       │  C  │     │  P  │     │     │  C  │
+│12. CustomerNotified    │  C  │     │     │     │     │  P  │
+│13. OrderRejected       │  P  │     │     │     │     │  C  │
+│14. CancellationReq.    │  P  │     │     │     │     │  C  │
+│15. RefundInitiated     │  C  │  P  │     │     │  C  │  C  │
+│16. RefundCompleted     │  C  │  P  │     │     │     │  C  │
+│17. ReturnApproved      │  C  │     │     │     │  P  │  C  │
+│18. ReturnReceived      │  C  │     │     │     │  P  │  C  │
+│19. ModificationReq.    │  P  │     │     │     │     │  C  │
+│20. OrderModified       │  P  │  T  │  T  │     │     │  C  │
+└────────────────────────┴─────┴─────┴─────┴─────┴─────┴─────┘
+
+LEGENDĂ:
+P = Produce (contextul generează evenimentul)
+C = Consume (contextul ascultă evenimentul)
+T = Trigger (evenimentul declanșează o acțiune în context)
+
+OM  = ORDER MANAGEMENT
+PAY = PAYMENT
+INV = INVENTORY
+SHP = SHIPPING
+RET = RETURNS
+NOT = NOTIFICATION
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 FLUX DE EVENIMENTE ÎNTRE CONTEXTE - HAPPY PATH
+═══════════════════════════════════════════════════════════════════════════════
+
+[CLIENT] → PlaceOrderCommand
+           ↓
+    ┌──────────────────┐
+    │ ORDER MANAGEMENT │ ① OrderPlaced
+    └────────┬─────────┘
+             │ ValidateOrderCommand
+             ▼
+    ┌──────────────────┐
+    │ ORDER MANAGEMENT │ ② OrderValidated
+    └────────┬─────────┘
+             │ Domain Event
+             ▼
+    ┌──────────────────┐
+    │    INVENTORY     │ ③ StockReserved
+    └────────┬─────────┘
+             │ Domain Event
+             ▼
+    ┌──────────────────┐
+    │ ORDER MANAGEMENT │ ④ OrderConfirmed
+    └────────┬─────────┘
+             │ ProcessPaymentCommand
+             ▼
+    ┌──────────────────┐
+    │     PAYMENT      │ ⑤ PaymentCompleted
+    └────────┬─────────┘
+             │ Domain Event
+             ▼
+    ┌──────────────────┐
+    │     SHIPPING     │ ⑥ OrderShipped
+    └────────┬─────────┘
+             │ ConfirmDeliveryCommand
+             ▼
+    ┌──────────────────┐
+    │     SHIPPING     │ ⑦ OrderDelivered
+    └────────┬─────────┘
+             │ Domain Event
+             ▼
+    ┌──────────────────┐
+    │    INVENTORY     │ ⑧ StockReleased
+    └──────────────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │   NOTIFICATION   │ ⑨ CustomerNotified (la fiecare pas)
+    └──────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+💡 RECOMANDĂRI DE IMPLEMENTARE
+═══════════════════════════════════════════════════════════════════════════════
+
+1️⃣ COMUNICARE ÎNTRE CONTEXTE:
+   ✅ Folosește Domain Events pentru comunicare asincronă
+   ✅ Implementează Event Bus (RabbitMQ, Azure Service Bus, Kafka)
+   ✅ Fiecare context își publică propriile evenimente
+   ✅ Contextele se abonează la evenimentele relevante
+
+2️⃣ CONSISTENȚĂ DATE:
+   ✅ Eventual Consistency între contexte
+   ✅ Strong Consistency în interiorul contextului
+   ✅ Saga Pattern pentru tranzacții distribuite
+   ✅ Compensation logic pentru rollback
+
+3️⃣ AUTONOMIE CONTEXTE:
+   ✅ Fiecare context are propria bază de date
+   ✅ Nu există shared database între contexte
+   ✅ Fiecare context își definește propriile modele
+   ✅ Anti-Corruption Layer pentru integrări
+
+4️⃣ PRIORITIZARE IMPLEMENTARE:
+   Sprint 1: ORDER MANAGEMENT + INVENTORY + NOTIFICATION
+   Sprint 2: PAYMENT + SHIPPING
+   Sprint 3: RETURNS + optimizări
+
+5️⃣ TEHNOLOGII RECOMANDATE:
+   - .NET 9 pentru fiecare microserviciu
+   - MediatR pentru comenzi și evenimente interne
+   - RabbitMQ/Azure Service Bus pentru evenimente externe
+   - Entity Framework Core pentru persistență
+   - Redis pentru caching
+   - Serilog pentru logging centralizat
