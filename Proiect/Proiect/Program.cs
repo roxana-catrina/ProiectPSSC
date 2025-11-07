@@ -1,6 +1,7 @@
 using Microsoft.OpenApi.Models;
 using Proiect.Infrastructure.Persistence;
 using Proiect.Application.Inventory.Handlers;
+using Proiect.Application.Shipping.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,12 @@ builder.Services.AddSwaggerGen(c =>
 // ═══════════════════════════════════════════════════════════════════════════════
 builder.Services.AddSingleton<IInventoryRepository, InMemoryInventoryRepository>();
 builder.Services.AddScoped<InventoryCommandHandlers>();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHIPPING & DELIVERY BOUNDED CONTEXT - Dependency Injection
+// ═══════════════════════════════════════════════════════════════════════════════
+builder.Services.AddSingleton<IShipmentRepository, InMemoryShipmentRepository>();
+builder.Services.AddScoped<ShippingCommandHandlers>();
 
 WebApplication app = builder.Build();
 

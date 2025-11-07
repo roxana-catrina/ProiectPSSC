@@ -1,0 +1,454 @@
+﻿### ═══════════════════════════════════════════════════════════════════════════
+### 📦 SHIPPING & DELIVERY BOUNDED CONTEXT - API EXAMPLES
+### ═══════════════════════════════════════════════════════════════════════════
+### Exemple de request-uri pentru testarea API-ului Shipping & Delivery
+### Data: November 7, 2025
+### ═══════════════════════════════════════════════════════════════════════════
+
+@baseUrl = https://localhost:7075/api
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 1. CREATE SHIPMENT
+### Creează un shipment pentru o comandă
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping
+Content-Type: application/json
+
+{
+  "orderId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "recipientName": "John Doe",
+  "street": "123 Main Street, Apt 4B",
+  "city": "Bucharest",
+  "postalCode": "010101",
+  "country": "Romania",
+  "phone": "+40712345678",
+  "additionalInfo": "Call before delivery"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 2. GET SHIPMENT BY ID
+### Obține detalii complete despre un shipment
+### ═══════════════════════════════════════════════════════════════════════════
+
+GET {{baseUrl}}/shipping/{{shipmentId}}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 3. GET SHIPMENT BY ORDER ID
+### Găsește shipment-ul pentru o comandă
+### ═══════════════════════════════════════════════════════════════════════════
+
+GET {{baseUrl}}/shipping/order/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 4. TRACK SHIPMENT (Public Tracking)
+### Tracking public prin numărul de urmărire
+### ═══════════════════════════════════════════════════════════════════════════
+
+GET {{baseUrl}}/shipping/track/DHL123456789
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 5. PREPARE FOR SHIPMENT
+### COMANDĂ: PrepareForShipment → EVENIMENT: ShipmentPrepared
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/prepare
+Content-Type: application/json
+
+{
+  "notes": "Package prepared and labeled, ready for pickup"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 6. SHIP ORDER (Expediere)
+### COMANDĂ: ShipOrder → EVENIMENT: OrderShipped ⭐
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "DHL Express",
+  "trackingNumber": "DHL123456789",
+  "estimatedDeliveryDate": "2025-11-10T18:00:00Z"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 7. UPDATE TRACKING (In Transit)
+### COMANDĂ: UpdateTracking → EVENIMENT: ShipmentTrackingUpdated
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Bucharest Distribution Center",
+  "status": "In transit to delivery location",
+  "notes": "Out for delivery"
+}
+
+###
+
+# Update tracking - arrived at destination hub
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Local Delivery Hub - Sector 1",
+  "status": "Arrived at local hub",
+  "notes": "Scheduled for delivery today"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 8. DELIVER ORDER (Livrare Finală)
+### COMANDĂ: DeliverOrder → EVENIMENT: OrderDelivered ⭐
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/deliver
+Content-Type: application/json
+
+{
+  "recipientName": "John Doe",
+  "deliveredBy": "Courier #1234 - Alex Popescu",
+  "notes": "Delivered and signed by recipient"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 9. MARK AS LOST
+### COMANDĂ: MarkShipmentAsLost → EVENIMENT: ShipmentLost
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/mark-lost
+Content-Type: application/json
+
+{
+  "reason": "Package lost in transit after 14 days investigation"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 10. MARK AS RETURNED
+### COMANDĂ: MarkShipmentAsReturned → EVENIMENT: ShipmentReturned
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/mark-returned
+Content-Type: application/json
+
+{
+  "reason": "Recipient not available, 3 delivery attempts failed"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 11. UPDATE DELIVERY ADDRESS (Before Shipping)
+### COMANDĂ: UpdateDeliveryAddress → EVENIMENT: DeliveryAddressUpdated
+### ═══════════════════════════════════════════════════════════════════════════
+
+PUT {{baseUrl}}/shipping/{{shipmentId}}/address
+Content-Type: application/json
+
+{
+  "recipientName": "John Doe",
+  "street": "456 New Street, Building 2",
+  "city": "Bucharest",
+  "postalCode": "020202",
+  "country": "Romania",
+  "phone": "+40712345678",
+  "additionalInfo": "New address - doorbell broken, please call"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### SCENARII DE TESTARE
+### ═══════════════════════════════════════════════════════════════════════════
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 1: HAPPY PATH - Livrare cu succes
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1: Creează shipment pentru comandă
+POST {{baseUrl}}/shipping
+Content-Type: application/json
+
+{
+  "orderId": "550e8400-e29b-41d4-a716-446655440000",
+  "recipientName": "Maria Ionescu",
+  "street": "Str. Victoriei, nr. 100",
+  "city": "Cluj-Napoca",
+  "postalCode": "400001",
+  "country": "Romania",
+  "phone": "+40723456789"
+}
+
+###
+
+# Step 2: Verifică starea inițială
+GET {{baseUrl}}/shipping/order/550e8400-e29b-41d4-a716-446655440000
+
+###
+
+# Step 3: Pregătește pentru expediere
+POST {{baseUrl}}/shipping/{{shipmentId}}/prepare
+Content-Type: application/json
+
+{
+  "notes": "Package ready for DHL pickup"
+}
+
+###
+
+# Step 4: Expediere cu DHL
+POST {{baseUrl}}/shipping/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "DHL",
+  "trackingNumber": "DHL987654321",
+  "estimatedDeliveryDate": "2025-11-09T17:00:00Z"
+}
+
+###
+
+# Step 5: Update tracking - în tranzit
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Cluj-Napoca Hub",
+  "status": "Out for delivery"
+}
+
+###
+
+# Step 6: Livrare finală
+POST {{baseUrl}}/shipping/{{shipmentId}}/deliver
+Content-Type: application/json
+
+{
+  "recipientName": "Maria Ionescu",
+  "deliveredBy": "Courier #567",
+  "notes": "Package delivered successfully"
+}
+
+###
+
+# Step 7: Verifică tracking public
+GET {{baseUrl}}/shipping/track/DHL987654321
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 2: Livrare eșuată - Retur
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1-4: ... (ca în happy path - până la shipping)
+
+# Step 5: Tentativă de livrare eșuată
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Recipient Address",
+  "status": "Delivery attempted - recipient not available",
+  "notes": "First attempt failed"
+}
+
+###
+
+# Step 6: A doua tentativă eșuată
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Recipient Address",
+  "status": "Second delivery attempt failed"
+}
+
+###
+
+# Step 7: Returnare după 3 tentative
+POST {{baseUrl}}/shipping/{{shipmentId}}/mark-returned
+Content-Type: application/json
+
+{
+  "reason": "Recipient unavailable after 3 delivery attempts"
+}
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 3: Modificare adresă înainte de expediere
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1: Creează shipment
+POST {{baseUrl}}/shipping
+Content-Type: application/json
+
+{
+  "orderId": "test-order-123",
+  "recipientName": "Test User",
+  "street": "Old Street 1",
+  "city": "Timisoara",
+  "postalCode": "300001",
+  "country": "Romania"
+}
+
+###
+
+# Step 2: Client își dă seama că adresa e greșită
+PUT {{baseUrl}}/shipping/{{shipmentId}}/address
+Content-Type: application/json
+
+{
+  "recipientName": "Test User",
+  "street": "New Correct Street 100",
+  "city": "Timisoara",
+  "postalCode": "300100",
+  "country": "Romania",
+  "phone": "+40734567890"
+}
+
+###
+
+# Step 3: Pregătește și expediază cu adresa corectă
+POST {{baseUrl}}/shipping/{{shipmentId}}/prepare
+
+###
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "FanCourier",
+  "trackingNumber": "FAN123456789"
+}
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 4: EROARE - Încercare de modificare adresă după shipping
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1-3: Creează, pregătește și expediază
+# ...
+
+# Step 4: Încearcă să modifice adresa DUPĂ shipping (ar trebui să eșueze)
+PUT {{baseUrl}}/shipping/{{shipmentId}}/address
+Content-Type: application/json
+
+{
+  "recipientName": "Test User",
+  "street": "Should Not Work Street",
+  "city": "Bucharest",
+  "postalCode": "010101",
+  "country": "Romania"
+}
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 5: EROARE - Livrare fără expediere
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1: Creează shipment
+POST {{baseUrl}}/shipping
+Content-Type: application/json
+
+{
+  "orderId": "error-test-order",
+  "recipientName": "Error Test",
+  "street": "Test Street",
+  "city": "Bucharest",
+  "postalCode": "010101",
+  "country": "Romania"
+}
+
+###
+
+# Step 2: Încearcă să livrezi direct fără ship (ar trebui să eșueze)
+POST {{baseUrl}}/shipping/{{shipmentId}}/deliver
+Content-Type: application/json
+
+{
+  "recipientName": "Error Test",
+  "deliveredBy": "Should fail"
+}
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 6: TRACKING MULTIPLU - Vizibilitate completă
+### ─────────────────────────────────────────────────────────────────────────
+
+# După shipping, adaugă multiple update-uri de tracking
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Bucharest Sorting Center",
+  "status": "Received at sorting facility"
+}
+
+###
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "In transit - Highway A1",
+  "status": "On route to Cluj-Napoca"
+}
+
+###
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Cluj-Napoca Distribution Center",
+  "status": "Arrived at destination hub"
+}
+
+###
+
+POST {{baseUrl}}/shipping/{{shipmentId}}/tracking
+Content-Type: application/json
+
+{
+  "location": "Local delivery vehicle",
+  "status": "Out for delivery"
+}
+
+###
+
+# Verifică toate evenimentele de tracking
+GET {{baseUrl}}/shipping/{{shipmentId}}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### TESTE PENTRU INVARIANȚI
+### ═══════════════════════════════════════════════════════════════════════════
+
+### TEST INVARIANT: Carrier și TrackingNumber obligatorii la shipping
+POST {{baseUrl}}/shipping/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "",
+  "trackingNumber": "TEST123"
+}
+# Ar trebui să eșueze - carrier gol
+
+###
+
+### TEST INVARIANT: Status progression secvențială
+# Încearcă să expediezi fără să pregătești (Status != Prepared)
+POST {{baseUrl}}/shipping/{{shipmentId}}/ship
+Content-Type: application/json
+
+{
+  "carrier": "DHL",
+  "trackingNumber": "TEST123"
+}
+# Ar trebui să eșueze dacă status = Created
+
+###
+
+### TEST INVARIANT: Nu poți livra de 2 ori
+# După prima livrare cu succes, încearcă din nou
+POST {{baseUrl}}/shipping/{{shipmentId}}/deliver
+Content-Type: application/json
+
+{
+  "recipientName": "Test",
+  "deliveredBy": "Test"
+}
+# Ar trebui să eșueze - already delivered
+
