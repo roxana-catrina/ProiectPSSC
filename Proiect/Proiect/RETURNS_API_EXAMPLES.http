@@ -1,0 +1,360 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# 🔄 RETURNS MANAGEMENT API - EXEMPLE DE UTILIZARE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Bounded Context: RETURNS
+# Data: November 7, 2025
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### Variabile
+@baseUrl = https://localhost:7001
+@returnId = {{requestReturn.response.body.returnId}}
+@rmaCode = {{requestReturn.response.body.rmaCode}}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO 1: HAPPY PATH - Retur complet pentru produs defect
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### 1️⃣ STEP 1: Client solicită retur pentru produs defect
+# @name requestReturn
+POST {{baseUrl}}/api/returns/request
+Content-Type: application/json
+
+{
+  "orderId": "11111111-1111-1111-1111-111111111111",
+  "customerId": "22222222-2222-2222-2222-222222222222",
+  "customerName": "Ion Popescu",
+  "customerEmail": "ion.popescu@example.com",
+  "items": [
+    {
+      "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "productName": "Laptop Dell XPS 15",
+      "quantity": 1,
+      "unitPrice": 299.99,
+      "productCategory": "electronics"
+    }
+  ],
+  "reason": "DefectiveProduct",
+  "detailedDescription": "The laptop does not power on. Tried different power outlets and cables but no response.",
+  "orderDeliveryDate": "2025-11-02T00:00:00Z",
+  "productCategory": "electronics"
+}
+
+### 2️⃣ STEP 2: Verificare status retur
+GET {{baseUrl}}/api/returns/{{returnId}}?customerId=22222222-2222-2222-2222-222222222222
+
+### 3️⃣ STEP 3: Manager aprobă returul
+POST {{baseUrl}}/api/returns/{{returnId}}/approve
+Content-Type: application/json
+
+{
+  "approvedBy": "99999999-9999-9999-9999-999999999999",
+  "approverName": "Manager George Marinescu",
+  "approvalNotes": "Approved - defective product confirmed by customer service. No restocking fee due to defect.",
+  "applyRestockingFee": false,
+  "approverRole": "Manager"
+}
+
+### 4️⃣ STEP 4: Depozit primește produsul returnat
+POST {{baseUrl}}/api/returns/{{returnId}}/receive
+Content-Type: application/json
+
+{
+  "receivedBy": "88888888-8888-8888-8888-888888888888",
+  "receiverName": "Warehouse Staff Andrei",
+  "receivedItems": [
+    {
+      "productId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "quantityReceived": 1,
+      "condition": "Defective",
+      "conditionNotes": "Product does not power on. Confirmed defect. Original packaging intact.",
+      "acceptableForResale": false
+    }
+  ],
+  "trackingNumber": "TRACK-RET-123456",
+  "warehouseLocation": "WAREHOUSE-A-RETURNS-SECTION",
+  "inspectionNotes": "Defect confirmed - will be sent for repair or disposal"
+}
+
+### 5️⃣ STEP 5: Acceptare finală și procesare rambursare
+POST {{baseUrl}}/api/returns/{{returnId}}/accept
+Content-Type: application/json
+
+{
+  "acceptedBy": "77777777-7777-7777-7777-777777777777",
+  "accepterName": "Finance Manager Ana Popescu",
+  "refundMethod": "OriginalPaymentMethod",
+  "refundReference": "REFUND-2025-11-001",
+  "notes": "Full refund approved - defective product. Amount: 299.99 RON",
+  "inventoryUpdated": true
+}
+
+### 6️⃣ STEP 6: Verificare finală status
+GET {{baseUrl}}/api/returns/{{returnId}}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO 2: Retur cu taxă de restocking (client și-a schimbat decizia)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### 1️⃣ Client solicită retur - și-a schimbat decizia
+# @name requestReturnChangedMind
+POST {{baseUrl}}/api/returns/request
+Content-Type: application/json
+
+{
+  "orderId": "33333333-3333-3333-3333-333333333333",
+  "customerId": "44444444-4444-4444-4444-444444444444",
+  "customerName": "Maria Ionescu",
+  "customerEmail": "maria.ionescu@example.com",
+  "items": [
+    {
+      "productId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "productName": "Headphones Sony WH-1000XM5",
+      "quantity": 1,
+      "unitPrice": 150.00,
+      "productCategory": "electronics"
+    }
+  ],
+  "reason": "ChangedMind",
+  "detailedDescription": "Product is fine but I changed my mind about the purchase",
+  "orderDeliveryDate": "2025-10-25T00:00:00Z",
+  "productCategory": "electronics"
+}
+
+### 2️⃣ Manager aprobă cu taxă de restocking
+POST {{baseUrl}}/api/returns/{{requestReturnChangedMind.response.body.returnId}}/approve
+Content-Type: application/json
+
+{
+  "approvedBy": "99999999-9999-9999-9999-999999999999",
+  "approverName": "Manager George Marinescu",
+  "approvalNotes": "Approved with 10% restocking fee as per electronics policy for opened products",
+  "applyRestockingFee": true,
+  "approverRole": "Manager"
+}
+
+### 3️⃣ Primire produs - ambalaj deschis
+POST {{baseUrl}}/api/returns/{{requestReturnChangedMind.response.body.returnId}}/receive
+Content-Type: application/json
+
+{
+  "receivedBy": "88888888-8888-8888-8888-888888888888",
+  "receiverName": "Warehouse Staff Mihai",
+  "receivedItems": [
+    {
+      "productId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "quantityReceived": 1,
+      "condition": "Opened",
+      "conditionNotes": "Product opened but appears unused. All accessories present.",
+      "acceptableForResale": true
+    }
+  ],
+  "trackingNumber": "TRACK-RET-789012",
+  "warehouseLocation": "WAREHOUSE-B-RESALE-SHELF-20",
+  "inspectionNotes": "Product in good condition, can be resold as 'opened box'"
+}
+
+### 4️⃣ Acceptare cu taxă de restocking
+POST {{baseUrl}}/api/returns/{{requestReturnChangedMind.response.body.returnId}}/accept
+Content-Type: application/json
+
+{
+  "acceptedBy": "77777777-7777-7777-7777-777777777777",
+  "accepterName": "Finance Manager Ana Popescu",
+  "refundMethod": "OriginalPaymentMethod",
+  "refundReference": "REFUND-2025-11-002",
+  "notes": "Refund with 10% restocking fee. Original: 150.00, Fee: 15.00, Refund: 135.00 RON",
+  "inventoryUpdated": true
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO 3: Respingere retur (perioada expirată)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### 1️⃣ Încercare retur pentru comandă veche (peste 30 zile)
+# @name requestReturnExpired
+POST {{baseUrl}}/api/returns/request
+Content-Type: application/json
+
+{
+  "orderId": "55555555-5555-5555-5555-555555555555",
+  "customerId": "66666666-6666-6666-6666-666666666666",
+  "customerName": "Alexandru Stan",
+  "customerEmail": "alex.stan@example.com",
+  "items": [
+    {
+      "productId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "productName": "Smart Watch Samsung Galaxy",
+      "quantity": 1,
+      "unitPrice": 450.00,
+      "productCategory": "electronics"
+    }
+  ],
+  "reason": "DefectiveProduct",
+  "detailedDescription": "Product stopped working",
+  "orderDeliveryDate": "2025-10-01T00:00:00Z",
+  "productCategory": "electronics"
+}
+
+### 2️⃣ Verificare eroare (perioada expirată)
+# Răspunsul ar trebui să fie 400 Bad Request cu mesaj despre perioada expirată
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO 4: Retur parțial (doar unele produse din comandă)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### 1️⃣ Retur doar pentru un produs din comandă
+# @name requestPartialReturn
+POST {{baseUrl}}/api/returns/request
+Content-Type: application/json
+
+{
+  "orderId": "11111111-1111-1111-1111-111111111111",
+  "customerId": "22222222-2222-2222-2222-222222222222",
+  "customerName": "Ion Popescu",
+  "customerEmail": "ion.popescu@example.com",
+  "items": [
+    {
+      "productId": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "productName": "Mouse Logitech MX Master",
+      "quantity": 1,
+      "unitPrice": 89.99,
+      "productCategory": "electronics"
+    }
+  ],
+  "reason": "NotAsDescribed",
+  "detailedDescription": "The mouse color doesn't match the product description",
+  "orderDeliveryDate": "2025-11-02T00:00:00Z",
+  "productCategory": "electronics"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO 5: Respingere manuală de către manager
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### 1️⃣ Solicitare retur
+# @name requestReturnForRejection
+POST {{baseUrl}}/api/returns/request
+Content-Type: application/json
+
+{
+  "orderId": "11111111-1111-1111-1111-111111111111",
+  "customerId": "22222222-2222-2222-2222-222222222222",
+  "customerName": "Ion Popescu",
+  "customerEmail": "ion.popescu@example.com",
+  "items": [
+    {
+      "productId": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      "productName": "USB Cable",
+      "quantity": 5,
+      "unitPrice": 5.00,
+      "productCategory": "accessories"
+    }
+  ],
+  "reason": "ChangedMind",
+  "detailedDescription": "Changed mind",
+  "orderDeliveryDate": "2025-11-02T00:00:00Z",
+  "productCategory": "accessories"
+}
+
+### 2️⃣ Manager respinge returul (valoare prea mică)
+POST {{baseUrl}}/api/returns/{{requestReturnForRejection.response.body.returnId}}/reject
+Content-Type: application/json
+
+{
+  "rejectedBy": "99999999-9999-9999-9999-999999999999",
+  "rejectorName": "Manager George Marinescu",
+  "rejectionReason": "Return value below minimum threshold",
+  "detailedExplanation": "The return amount (25.00 RON) is below our minimum return processing threshold. Shipping costs would exceed the product value.",
+  "notifyCustomer": true
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIO 6: Verificare autorizații (suma mare necesită Supervisor)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### 1️⃣ Solicitare retur pentru sumă mare
+# @name requestHighValueReturn
+POST {{baseUrl}}/api/returns/request
+Content-Type: application/json
+
+{
+  "orderId": "11111111-1111-1111-1111-111111111111",
+  "customerId": "22222222-2222-2222-2222-222222222222",
+  "customerName": "Ion Popescu",
+  "customerEmail": "ion.popescu@example.com",
+  "items": [
+    {
+      "productId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+      "productName": "MacBook Pro 16 inch",
+      "quantity": 1,
+      "unitPrice": 12999.99,
+      "productCategory": "electronics"
+    }
+  ],
+  "reason": "DefectiveProduct",
+  "detailedDescription": "Screen has dead pixels",
+  "orderDeliveryDate": "2025-11-02T00:00:00Z",
+  "productCategory": "electronics"
+}
+
+### 2️⃣ Încercare aprobare cu rol Manager (va eșua - necesită Supervisor)
+POST {{baseUrl}}/api/returns/{{requestHighValueReturn.response.body.returnId}}/approve
+Content-Type: application/json
+
+{
+  "approvedBy": "99999999-9999-9999-9999-999999999999",
+  "approverName": "Manager George Marinescu",
+  "approvalNotes": "Attempting approval",
+  "applyRestockingFee": false,
+  "approverRole": "Manager"
+}
+
+### 3️⃣ Aprobare cu rol Supervisor (va reuși)
+POST {{baseUrl}}/api/returns/{{requestHighValueReturn.response.body.returnId}}/approve
+Content-Type: application/json
+
+{
+  "approvedBy": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "approverName": "Supervisor Elena Vasilescu",
+  "approvalNotes": "High value return approved by supervisor",
+  "applyRestockingFee": false,
+  "approverRole": "Supervisor"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# QUERIES - Verificare statusuri
+# ═══════════════════════════════════════════════════════════════════════════════
+
+### Căutare după RMA Code
+GET {{baseUrl}}/api/returns/rma/{{rmaCode}}
+
+### Verificare status cu autentificare client
+GET {{baseUrl}}/api/returns/{{returnId}}?customerId=22222222-2222-2222-2222-222222222222
+
+### Verificare status fără customerId (doar pentru admin/staff)
+GET {{baseUrl}}/api/returns/{{returnId}}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NOTES:
+# 
+# 1. Toate endpoint-urile returnează:
+#    - Success: true/false
+#    - Message: Descriere
+#    - ValidationErrors: Lista de erori (dacă există)
+# 
+# 2. Fluxul normal: Requested → Approved → Received → Accepted
+# 
+# 3. StatusCodes:
+#    - 200 OK: Operație reușită
+#    - 201 Created: Retur creat cu succes
+#    - 400 Bad Request: Validare eșuată
+#    - 403 Forbidden: Permisiuni insuficiente
+#    - 404 Not Found: Resursa nu există
+# 
+# 4. RMA Code format: RMA-YYYYMMDD-{8 chars from GUID}
+# 
+# 5. Pentru testare, folosiți IDs din MockOrderService:
+#    - Order: 11111111-1111-1111-1111-111111111111 (livrat acum 5 zile)
+#    - Customer: 22222222-2222-2222-2222-222222222222
+# ═══════════════════════════════════════════════════════════════════════════════
+
