@@ -1,4 +1,6 @@
 using Microsoft.OpenApi.Models;
+using Proiect.Infrastructure.Persistence;
+using Proiect.Application.Inventory.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +17,11 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Proiect PSSC", Version = "v1" });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVENTORY BOUNDED CONTEXT - Dependency Injection
+// ═══════════════════════════════════════════════════════════════════════════════
+builder.Services.AddSingleton<IInventoryRepository, InMemoryInventoryRepository>();
+builder.Services.AddScoped<InventoryCommandHandlers>();
 
 WebApplication app = builder.Build();
 

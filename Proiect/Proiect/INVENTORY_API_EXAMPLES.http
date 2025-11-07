@@ -1,0 +1,335 @@
+﻿### ═══════════════════════════════════════════════════════════════════════════
+### 📦 INVENTORY BOUNDED CONTEXT - API EXAMPLES
+### ═══════════════════════════════════════════════════════════════════════════
+### Exemple de request-uri pentru testarea API-ului Inventory
+### Data: November 7, 2025
+### ═══════════════════════════════════════════════════════════════════════════
+
+@baseUrl = https://localhost:7075/api
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 1. CREATE INVENTORY ITEM
+### COMANDĂ: CreateInventoryItem
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory
+Content-Type: application/json
+
+{
+  "sku": "PROD-001",
+  "initialStock": 100,
+  "minimumStockLevel": 10,
+  "reorderPoint": 20
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 2. GET INVENTORY ITEM (Single)
+### Query pentru a vedea starea curentă
+### ═══════════════════════════════════════════════════════════════════════════
+
+GET {{baseUrl}}/inventory/PROD-001
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 3. GET ALL INVENTORY ITEMS
+### Query pentru toate produsele
+### ═══════════════════════════════════════════════════════════════════════════
+
+GET {{baseUrl}}/inventory
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 4. RESERVE STOCK (Rezervare pentru comandă)
+### COMANDĂ: ReserveStock → EVENIMENT: StockReserved
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 5,
+  "reservationId": "550e8400-e29b-41d4-a716-446655440001",
+  "reason": "Order #12345 placed",
+  "expiresAt": "2025-11-08T10:00:00Z"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 5. RESERVE STOCK (fără ReservationId - se generează automat)
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 3,
+  "reason": "Order #12346 placed"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 6. RELEASE STOCK (Eliberare rezervare - comandă anulată)
+### COMANDĂ: ReleaseStock → EVENIMENT: StockReleased
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/release
+Content-Type: application/json
+
+{
+  "reservationId": "550e8400-e29b-41d4-a716-446655440001",
+  "quantity": 5,
+  "reason": "Order #12345 cancelled by customer"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 7. COMMIT RESERVATION (Transformare rezervare în consum - shipping)
+### COMANDĂ: CommitReservation → EVENIMENT: StockCommitted
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/commit
+Content-Type: application/json
+
+{
+  "reservationId": "550e8400-e29b-41d4-a716-446655440001",
+  "reason": "Order #12345 shipped"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 8. INCREASE STOCK (Recepție marfă)
+### COMANDĂ: IncreaseStock → EVENIMENT: StockIncreased
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/increase
+Content-Type: application/json
+
+{
+  "quantity": 50,
+  "reason": "Received shipment from supplier"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 9. DECREASE STOCK (Deteriorare/Pierdere)
+### COMANDĂ: DecreaseStock → EVENIMENT: StockDecreased
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/decrease
+Content-Type: application/json
+
+{
+  "quantity": 2,
+  "reason": "Damaged during storage"
+}
+
+### ═══════════════════════════════════════════════════════════════════════════
+### 10. EXPIRE RESERVATIONS (Manual trigger pentru rezervări expirate)
+### ═══════════════════════════════════════════════════════════════════════════
+
+POST {{baseUrl}}/inventory/PROD-001/expire-reservations
+
+### ═══════════════════════════════════════════════════════════════════════════
+### SCENARII DE TESTARE
+### ═══════════════════════════════════════════════════════════════════════════
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 1: HAPPY PATH - Comandă completă
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1: Creează produs
+POST {{baseUrl}}/inventory
+Content-Type: application/json
+
+{
+  "sku": "LAPTOP-001",
+  "initialStock": 10,
+  "minimumStockLevel": 2,
+  "reorderPoint": 5
+}
+
+###
+
+# Step 2: Verifică starea inițială
+GET {{baseUrl}}/inventory/LAPTOP-001
+
+###
+
+# Step 3: Rezervă pentru comandă
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 2,
+  "reservationId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "reason": "Order #ORDER-001"
+}
+
+###
+
+# Step 4: Verifică disponibilitatea după rezervare
+GET {{baseUrl}}/inventory/LAPTOP-001
+
+###
+
+# Step 5: Comite rezervarea (shipping)
+POST {{baseUrl}}/inventory/LAPTOP-001/commit
+Content-Type: application/json
+
+{
+  "reservationId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "reason": "Order #ORDER-001 shipped"
+}
+
+###
+
+# Step 6: Verifică starea finală
+GET {{baseUrl}}/inventory/LAPTOP-001
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 2: COMPENSARE - Comandă anulată
+### ─────────────────────────────────────────────────────────────────────────
+
+# Step 1: Rezervă stoc
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 3,
+  "reservationId": "cancelled-order-123",
+  "reason": "Order #ORDER-002"
+}
+
+###
+
+# Step 2: Client anulează comanda → eliberare stoc
+POST {{baseUrl}}/inventory/LAPTOP-001/release
+Content-Type: application/json
+
+{
+  "reservationId": "cancelled-order-123",
+  "quantity": 3,
+  "reason": "Order #ORDER-002 cancelled by customer"
+}
+
+###
+
+# Step 3: Verifică că stocul a fost eliberat
+GET {{baseUrl}}/inventory/LAPTOP-001
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 3: EROARE - Stoc insuficient
+### ─────────────────────────────────────────────────────────────────────────
+
+# Încercare de rezervare mai mult decât disponibil (ar trebui să eșueze)
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 999,
+  "reason": "Should fail - insufficient stock"
+}
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 4: IDEMPOTENȚĂ - Dublă rezervare cu același ID
+### ─────────────────────────────────────────────────────────────────────────
+
+# Prima rezervare
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 1,
+  "reservationId": "idempotent-test-id",
+  "reason": "Testing idempotency"
+}
+
+###
+
+# A doua rezervare cu ACELAȘI ID (ar trebui să eșueze)
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 1,
+  "reservationId": "idempotent-test-id",
+  "reason": "Duplicate reservation - should fail"
+}
+
+### ─────────────────────────────────────────────────────────────────────────
+### SCENARIU 5: MULTIPLE REZERVĂRI SIMULTAN
+### ─────────────────────────────────────────────────────────────────────────
+
+# Rezervare 1
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 2,
+  "reservationId": "reservation-A",
+  "reason": "Order A"
+}
+
+###
+
+# Rezervare 2
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 2,
+  "reservationId": "reservation-B",
+  "reason": "Order B"
+}
+
+###
+
+# Rezervare 3
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 2,
+  "reservationId": "reservation-C",
+  "reason": "Order C"
+}
+
+###
+
+# Verifică toate rezervările active
+GET {{baseUrl}}/inventory/LAPTOP-001
+
+### ═══════════════════════════════════════════════════════════════════════════
+### TESTE PENTRU INVARIANȚI
+### ═══════════════════════════════════════════════════════════════════════════
+
+### TEST INVARIANT 1: TotalOnHand >= 0
+# Încercare de scădere mai mult decât există (ar trebui să eșueze)
+POST {{baseUrl}}/inventory/LAPTOP-001/decrease
+Content-Type: application/json
+
+{
+  "quantity": 9999,
+  "reason": "Should fail - would result in negative stock"
+}
+
+### TEST INVARIANT 2: Reserved <= TotalOnHand
+# După ce rezervăm tot stocul, următoarea rezervare ar trebui să eșueze
+GET {{baseUrl}}/inventory/LAPTOP-001
+
+###
+
+# Rezervă tot disponibilul (verifică mai întâi Available din GET)
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 8,
+  "reservationId": "max-reservation",
+  "reason": "Reserve all available"
+}
+
+###
+
+# Încercare de a rezerva și mai mult (ar trebui să eșueze)
+POST {{baseUrl}}/inventory/LAPTOP-001/reserve
+Content-Type: application/json
+
+{
+  "quantity": 1,
+  "reason": "Should fail - no available stock"
+}
+
